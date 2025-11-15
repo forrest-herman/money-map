@@ -2,9 +2,10 @@ import dotenv from "dotenv";
 dotenv.config();
 import express from "express";
 import cors from "cors";
-import plaidRoutes from "./routes/plaidRoutes";
-import userRoutes from "./routes/institution.routes";
+import plaidRoutes from "./routes/plaid.routes";
+import userRoutes from "./routes/user.routes";
 import { errorHandler } from "./middleware/errorHandler";
+import transactionRoutes from "./routes/transaction.routes";
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -15,6 +16,7 @@ app.use(express.json());
 // Mount routes
 app.use("/plaid", plaidRoutes);
 app.use("/user", userRoutes);
+app.use("/transactions", transactionRoutes);
 
 // TODO: add logging middleware
 
