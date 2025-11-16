@@ -1,6 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { LogOut, Settings, Home, BarChart3, Wallet, PieChart, CreditCard, Map } from "lucide-react";
-import React from "react";
 import supabase from "../utils/supabaseClient";
 import styles from "./Layout.module.css";
 
