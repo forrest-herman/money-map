@@ -15,6 +15,8 @@ export const transactionsApi = backendApi.injectEndpoints({
                 url: `/transactions${buildQueryString({ page, limit, ...filters })}`,
                 method: "GET",
             }),
+            keepUnusedDataFor: 120,
+            providesTags: ["Transaction"],
         }),
     }),
 });

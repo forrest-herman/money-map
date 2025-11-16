@@ -22,5 +22,6 @@ export const backendApi = createApi({
             return headers;
         },
     }),
+    tagTypes: ["Transaction", "Institution", "Account"],
     endpoints: () => ({}),
 });
