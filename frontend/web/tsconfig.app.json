@@ -27,7 +27,6 @@
         /* File management */
         "rootDir": "../../",
         "outDir": "dist",
-        "baseUrl": ".",
         "paths": {
             "@shared/*": ["../../shared/*"]
         }
