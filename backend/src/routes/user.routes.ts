@@ -1,12 +1,11 @@
 import express from "express";
-import { getInstitutions } from "../control/user.controller";
+import { getInstitutions, upsertInstitution } from "../control/user.controller";
+import { authMiddleware } from "../middleware/authMiddleware";
 
 const router = express.Router();
 
-router.get("/institutions", getInstitutions);
-// TODO: post to institutions
+router.get("/institutions", authMiddleware, getInstitutions);
+router.post("/institutions", authMiddleware, upsertInstitution);
 // router.get("/categories");
-
-// router.get("/transactions"); // TODO: move to separate route
 
 export default router;
