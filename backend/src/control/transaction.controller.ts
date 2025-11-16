@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthenticatedRequest } from "../types/auth";
 import { getTransactions } from "../services/transaction.service";
-import { TransactionFilters } from "@shared/types/transaction.types";
+import { PaginationParams, TransactionFilters } from "@shared/types/transaction.types";
 
 export const getUserTransactions = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -20,8 +20,8 @@ export const getUserTransactions = async (req: Request, res: Response, next: Nex
 
         // Extract pagination
         const page = parseInt(req.query.page as string) || undefined;
-        const limit = parseInt(req.query.limit as string) || undefined;
-        const pagination = { page, limit };
+        const pageSize = parseInt(req.query.limit as string) || undefined;
+        const pagination: PaginationParams = { page, pageSize };
 
         const result = await getTransactions(userId, filters, pagination);
 

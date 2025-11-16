@@ -14,7 +14,7 @@ export type PaginationParams = {
 };
 
 export type PaginatedTransactionsResponse = {
-    items: any[];
+    transactions: any[];
     page: number;
     pageSize: number;
     totalCount: number;

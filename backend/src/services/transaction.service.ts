@@ -58,7 +58,7 @@ export const getTransactions = async (
     const totalCount = count ?? 0;
 
     return {
-        items: data ?? [],
+        transactions: data ?? [],
         page,
         pageSize,
         totalCount,
