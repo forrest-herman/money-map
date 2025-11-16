@@ -1,0 +1,87 @@
+/* Container with dark background */
+.container {
+    border-radius: 0.5rem;
+    background-color: #1f2937; /* gray-800 */
+    color: #f9fafb; /* gray-50 text */
+    overflow: hidden;
+    border: 1px solid #374151; /* gray-700 border */
+}
+
+/* Scrollable table wrapper */
+.tableContainer {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+/* Table layout */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+/* Sticky header row */
+.thead {
+    position: sticky;
+    top: 0;
+    background-color: #111827; /* dark header */
+    z-index: 10;
+    border-bottom: 1px solid #374151;
+}
+
+.th {
+    padding: 0.5rem 1rem;
+    text-align: left;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #f9fafb;
+}
+
+.thRight {
+    text-align: right;
+}
+
+/* Table body */
+.tbody {
+    border-top: 1px solid #374151;
+}
+
+/* Hover effect for rows */
+.trHover:hover {
+    background-color: #374151;
+}
+
+/* Cells */
+.td {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #374151;
+}
+
+.tdRight {
+    text-align: right;
+}
+
+/* Pagination / buttons */
+.pagination {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1rem;
+    padding: 0.5rem;
+}
+
+.button {
+    padding: 0.5rem 1rem;
+    background-color: #374151;
+    color: #f9fafb;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    border: none;
+}
+
+.button:hover:not(:disabled) {
+    background-color: #4b5563;
+}
+
+.buttonDisabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

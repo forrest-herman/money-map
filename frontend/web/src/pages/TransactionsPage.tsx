@@ -1,4 +1,4 @@
-import { TransactionList } from "../components/TransactionsList";
+import { TransactionList } from "../components/TransactionList";
 
 export const TransactionsPage = () => {
     return (
