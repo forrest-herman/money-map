@@ -22,8 +22,8 @@ export default function Layout() {
                     <nav className={styles.sidebarNav}>
                         <SidebarLink to='/' icon={<Home size={18} />} label='Dashboard' />
                         <SidebarLink to='/accounts' icon={<Wallet size={18} />} label='Accounts' />
-                        <SidebarLink to='/accounts' icon={<CreditCard size={18} />} label='Transactions' />
-                        <SidebarLink to='/accounts' icon={<PieChart size={18} />} label='Reports' />
+                        <SidebarLink to='/transactions' icon={<CreditCard size={18} />} label='Transactions' />
+                        <SidebarLink to='/reports' icon={<PieChart size={18} />} label='Reports' />
                     </nav>
                 </div>
 

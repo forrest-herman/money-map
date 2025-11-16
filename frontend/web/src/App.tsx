@@ -4,6 +4,7 @@ import PrivateRoute from "./routes/PrivateRoute";
 import Layout from "./components/Layout";
 import { DashboardPage } from "./pages/DashboardPage";
 import { AccountsPage } from "./pages/AccountsPage";
+import { TransactionsPage } from "./pages/TransactionsPage";
 
 export default function App() {
     return (
@@ -21,6 +22,7 @@ export default function App() {
                 >
                     <Route index element={<DashboardPage />} />
                     <Route path='accounts' element={<AccountsPage />} />
+                    <Route path='transactions' element={<TransactionsPage />} />
                 </Route>
             </Routes>
         </BrowserRouter>

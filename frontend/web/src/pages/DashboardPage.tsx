@@ -1,13 +1,9 @@
-import { LaunchLink } from "../components/LaunchLink";
+import { LinkBankButton } from "../components/LinkBankButton";
 import { Login } from "../components/Login";
-import { useCreateLinkTokenMutation } from "../utils/plaidApi";
 import { useGetSessionQuery } from "../utils/supabaseApi";
 
 export const DashboardPage = () => {
     const { data: session } = useGetSessionQuery();
-
-    const [createlink_token, { data: linkTokenObj, isLoading }] = useCreateLinkTokenMutation();
-    const { link_token } = linkTokenObj ?? {};
 
     console.log("session token", session?.access_token); // TODO: remove
 
@@ -19,14 +15,8 @@ export const DashboardPage = () => {
         return (
             <div>
                 <h2>Welcome {session.user.email}</h2>
-                <button onClick={() => createlink_token()} disabled={isLoading}>
-                    Link Bank
-                </button>
-
-                {link_token != null && link_token.length > 0 && (
-                    // Link will not render unless there is a link token
-                    <LaunchLink token={link_token} />
-                )}
+                <p>Link your first account now!</p>
+                <LinkBankButton />
             </div>
         );
 
