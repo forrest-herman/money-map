@@ -1,6 +1,6 @@
 import { usePlaidLink } from "react-plaid-link";
-import { useExchangePublicTokenMutation } from "../utils/backendApi";
 import { useEffect } from "react";
+import { useExchangePublicTokenMutation } from "../utils/plaidApi";
 
 export const LaunchLink = ({ token }: { token: string }) => {
     const [exchangeToken] = useExchangePublicTokenMutation();

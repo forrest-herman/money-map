@@ -1,6 +1,6 @@
 import { LaunchLink } from "../components/LaunchLink";
 import { Login } from "../components/Login";
-import { useCreateLinkTokenMutation } from "../utils/backendApi";
+import { useCreateLinkTokenMutation } from "../utils/plaidApi";
 import { useGetSessionQuery } from "../utils/supabaseApi";
 
 export const DashboardPage = () => {
@@ -12,9 +12,7 @@ export const DashboardPage = () => {
     console.log("session token", session?.access_token); // TODO: remove
 
     if (!session) return <Login />;
-    // <Auth supabaseClient={supabase} appearance={{ theme: ThemeSupa }} />;
 
-    //
     const linkedInstitutions = [];
 
     if (linkedInstitutions.length === 0)
