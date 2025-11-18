@@ -7,7 +7,7 @@ export const LaunchLink = ({ token }: { token: string }) => {
 
     const { open, ready } = usePlaidLink({
         token,
-        onSuccess: async (public_token, metadata) => {
+        onSuccess: async (public_token) => {
             // send public_token to server
             // Maybe dispatch a thunk instead?
             await exchangeToken({ public_token });
