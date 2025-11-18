@@ -15,7 +15,15 @@ export const plaidApi = backendApi.injectEndpoints({
                 body: { public_token },
             }),
         }),
+        syncTransactions: builder.mutation<any, void>({
+            query: () => ({
+                url: "/plaid/transactions/sync",
+                method: "POST",
+            }),
+            invalidatesTags: ["Institution", "Account", "Transaction"],
+            // TODO: only invalite transactions for that account / institution
+        }),
     }),
 });
 
-export const { useCreateLinkTokenMutation, useExchangePublicTokenMutation } = plaidApi;
+export const { useCreateLinkTokenMutation, useExchangePublicTokenMutation, useSyncTransactionsMutation } = plaidApi;
