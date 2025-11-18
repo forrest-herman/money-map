@@ -6,7 +6,7 @@ import { getInstitutionByItemId, getInstitutionsByUser, saveInstitutionItemToDB,
 import { upsertTransactions } from "../services/transaction.service";
 import { upsertAccountsToDB } from "../services/account.service";
 import { AuthenticatedRequest } from "../types/auth";
-import { PlaidWebhook } from "../types/plaidWebhooks";
+import { PlaidWebhook } from "../types/plaidWebhooks.types";
 import { mapPlaidAccount, mapPlaidTransaction } from "../utils/plaidMappingHelpers";
 
 /**
