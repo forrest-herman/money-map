@@ -1,6 +1,7 @@
 import { Item } from "plaid";
 import { AppError } from "../utils/errors";
 import { supabase } from "./config/supabaseClient";
+import { Institution } from "@shared/types/institution.types";
 
 /**
  * Fetches all linked institutions for a given user.
@@ -24,8 +25,10 @@ export const getInstitutionsByUser = async (userId: string) => {
  * @param itemId - Plaid item ID to look up.
  * @returns The institution record.
  */
-export const getInstitutionByItemId = async (itemId: string) => {
-    return supabase.from("linked_institutions").select("*").eq("item_id", itemId).single();
+export const getInstitutionByItemId = async (itemId: string): Promise<Institution> => {
+    const { data, error } = await supabase.from("linked_institutions").select("*").eq("item_id", itemId).single();
+    if (error) throw new AppError(`Failed to fetch institutions with itemId ${itemId}`, 500, error);
+    return data;
 };
 
 /**
