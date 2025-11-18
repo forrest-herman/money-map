@@ -4,6 +4,21 @@ import { supabase } from "./config/supabaseClient";
 import { Institution } from "@shared/types/institution.types";
 
 /**
+ * Fetches all linked financial institutions from the database.
+ *
+ * Queries the `linked_institutions` table in Supabase and returns all rows.
+ *
+ * @async
+ * @function
+ * @returns A promise that resolves to an array of `Institution` objects.
+ */
+export const getAllLinkedInstitutions = async (): Promise<Institution[]> => {
+    const { data, error } = await supabase.from("linked_institutions").select("*"); // select all columns
+    if (error) throw new AppError(`Failed to fetch all linked institutions`, 500, error);
+    else return data;
+};
+
+/**
  * Fetches all linked institutions for a given user.
  *
  * @param userId - The ID of the user whose institutions to fetch.

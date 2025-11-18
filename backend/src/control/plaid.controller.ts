@@ -2,12 +2,15 @@ import { Request, Response, NextFunction } from "express";
 import { exchangePublicToken, fetchItemAccountsData, fetchTransactionSync, linkTokenCreate, getTransactions } from "../services/plaid.service";
 import { ItemAlreadyExistsError } from "../utils/errors";
 import { CountryCode, Products } from "plaid";
-import { getInstitutionByItemId, getInstitutionsByUser, saveInstitutionItemToDB, updateInstitutionItemCursor } from "../services/institution.service";
+import { getAllLinkedInstitutions, getInstitutionByItemId, getInstitutionsByUser, saveInstitutionItemToDB, updateInstitutionItemCursor } from "../services/institution.service";
 import { upsertTransactions } from "../services/transaction.service";
 import { upsertAccountsToDB } from "../services/account.service";
 import { AuthenticatedRequest } from "../types/auth";
 import { PlaidWebhook } from "../types/plaidWebhooks.types";
 import { mapPlaidAccount, mapPlaidTransaction } from "../utils/plaidMappingHelpers";
+import { Institution } from "@shared/types/institution.types";
+
+const API_BASE_URL = process.env.RENDER_EXTERNAL_URL || process.env.API_BASE_URL;
 
 /**
  * Express handler for Plaid webhooks.
@@ -81,7 +84,7 @@ export const createLinkToken = async (req: Request, res: Response, next: NextFun
             client_name: APP_NAME,
             country_codes: [CountryCode.Ca, CountryCode.Us],
             language: "en",
-            webhook: `${process.env.API_URL}/plaid/webhook`,
+            webhook: `${API_BASE_URL}/plaid/webhook`,
         };
 
         let payload;
@@ -172,6 +175,77 @@ export const syncTransactions = async (req: Request, res: Response, next: NextFu
 };
 
 /**
+ * Syncs all linked institutions for all users in the system.
+ *
+ * This endpoint is intended to be triggered by a cron job or internal system,
+ * not by end-users. It requires the `x-cron-secret` header to match the
+ * environment variable `CRON_SECRET_KEY` for authorization.
+ *
+ * The function:
+ * 1. Checks the `x-cron-secret` header for authorization.
+ * 2. Fetches all users' linked institutions via `getAllLinkedInstitutions()`.
+ * 3. Calls `syncItem` for each item in parallel.
+ * 4. Returns a summary of succeeded and failed syncs per user/item.
+ *
+ * @param {Request} req - Express request object. Must include header `x-cron-secret`.
+ * @param {Response} res - Express response object. Returns a JSON summary.
+ * @param {NextFunction} next - Express next function for error handling.
+ *
+ * @returns {Promise<void>} Responds with JSON:
+ *  {
+ *    succeeded: number, // number of successful item syncs
+ *    failed: number,    // number of failed item syncs
+ *    items: Array<{
+ *      user_id: string,
+ *      item: object,
+ *      success: boolean,
+ *      reason?: string,
+ *      context?: any
+ *    }>
+ *  }
+ */
+export const handleSyncAllTransactions = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const key = req.headers["x-cron-secret"];
+        if (key !== process.env.CRON_SECRET_KEY) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        // Retrieve all users' items
+        const items = await getAllLinkedInstitutions();
+        if (!items || items.length === 0) {
+            return res.json({ message: "No items found for any users" });
+        }
+
+        // Iterate over items in parallel
+        const results = await Promise.allSettled(items.map((item) => syncItem(item, item.user_id)));
+
+        const summary = results.map((r, idx) => {
+            const item = items[idx];
+            const userId = item.user_id;
+            if (r.status === "fulfilled") {
+                return { userId, item, success: true, ...r.value };
+            } else {
+                return {
+                    userId,
+                    item,
+                    success: false,
+                    reason: r.reason?.message || "Unknown error",
+                    context: r.reason?.context,
+                };
+            }
+        });
+
+        const succeeded = summary.filter((r) => r.success).length;
+        const failed = summary.filter((r) => !r.success).length;
+
+        res.json({ succeeded, failed, items: summary });
+    } catch (err) {
+        next(err);
+    }
+};
+
+/**
  * Syncs a single Plaid item:
  * - Upserts accounts
  * - Upserts added + modified transactions
@@ -179,11 +253,11 @@ export const syncTransactions = async (req: Request, res: Response, next: NextFu
  *
  * Returns a summary for this item.
  */
-const syncItem = async (item: { access_token: string; item_id: string; cursor?: string }, userId: string) => {
+const syncItem = async (item: Partial<Institution> & Pick<Institution, "access_token" | "item_id">, userId: string) => {
     const { access_token: accessToken, item_id: itemId, cursor } = item;
 
     // TODO: allow cursor = null for full re-sync
-    const data = await fetchTransactionSync(accessToken, cursor);
+    const data = await fetchTransactionSync(accessToken, cursor ?? undefined);
     const { accounts, added, modified, removed, next_cursor } = data;
 
     await upsertAccountsToDB(accounts.map((a) => mapPlaidAccount(a, userId, itemId)));
@@ -228,4 +302,3 @@ const handleSaveItemTransactionHistory = async (
     const formattedTx = transactions.map((t) => mapPlaidTransaction(t, userId, itemId));
     await upsertTransactions(formattedTx);
 };
-
