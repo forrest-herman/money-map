@@ -2,6 +2,7 @@ import type { TransactionFilters } from "@shared/types/transaction.types";
 import { useState, useEffect } from "react";
 import { useGetTransactionsQuery } from "../utils/transactionsApi";
 import styles from "./TransactionList.module.css";
+import { useGetAccountsQuery, useGetInstitutionsQuery } from "../utils/userApi";
 
 type TransactionListProps = {
     filters?: TransactionFilters;
@@ -12,6 +13,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ filters, pageS
     const [page, setPage] = useState(1);
 
     // TODO: try out infinite scroll
+
+    // TODO: this is bad, just use a join on the request instead and do the lookup in SQL
+    const { data: accounts, isLoading: isAccountsLoading } = useGetAccountsQuery();
+    const { data: institutions, isLoading: isInstitutionsLoading } = useGetInstitutionsQuery();
 
     const { data, isFetching, isLoading } = useGetTransactionsQuery({
         page,
@@ -27,6 +32,20 @@ export const TransactionList: React.FC<TransactionListProps> = ({ filters, pageS
         setPage(1);
     }, [filters]);
 
+    if (isLoading || isAccountsLoading || isInstitutionsLoading) return <div>Loading...</div>;
+
+    // TODO: move to utils
+    const getAccountNameByid = (accountId: string) => {
+        if (!accounts) return accountId;
+        const account = accounts.find((a) => a.account_id === accountId);
+        return account.official_name;
+    };
+
+    const getBankNameByItemId = (itemId: string) => {
+        const bank = institutions?.find((institution) => institution.item_id === itemId);
+        return bank.institution_name;
+    };
+
     return (
         <div className={styles.container}>
             {/* Scrollable table body */}
@@ -37,6 +56,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ filters, pageS
                             <th className={styles.th}>Date</th>
                             <th className={styles.th}>Merchant</th>
                             <th className={styles.th}>Name</th>
+                            <th className={styles.th}>Bank</th>
                             <th className={styles.th}>Account</th>
                             <th className={styles.th}>Category</th>
                             <th className={styles.th}>Subcategory</th>
@@ -52,7 +72,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ filters, pageS
                                 <td className={styles.td}>{new Date(tx.date).toLocaleDateString()}</td>
                                 <td className={styles.td}>{tx.merchant_name || "-"}</td>
                                 <td className={styles.td}>{tx.name || "-"}</td>
-                                <td className={styles.td}>{tx.account_id}</td>
+                                <td className={styles.td}>{getBankNameByItemId(tx.item_id)}</td>
+                                <td className={styles.td}>{getAccountNameByid(tx.account_id)}</td>
                                 <td className={styles.td}>{tx.category || "-"}</td>
                                 <td className={styles.td}>{tx.subcategory || "-"}</td>
                                 <td className={styles.td}>{tx.payment_channel || "-"}</td>
