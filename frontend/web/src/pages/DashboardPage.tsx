@@ -1,15 +1,17 @@
 import { LinkBankButton } from "../components/LinkBankButton";
 import { Login } from "../components/Login";
 import { useGetSessionQuery } from "../utils/supabaseApi";
+import { useGetInstitutionsQuery } from "../utils/userApi";
 
 export const DashboardPage = () => {
     const { data: session } = useGetSessionQuery();
+    const { data: linkedInstitutions, isLoading, isSuccess } = useGetInstitutionsQuery();
 
     if (!session) return <Login />;
 
-    const linkedInstitutions = [];
+    if (isLoading) return <div>Loading...</div>;
 
-    if (linkedInstitutions.length === 0)
+    if (isSuccess && linkedInstitutions.length === 0)
         return (
             <div>
                 <h2>Welcome {session.user.email}</h2>
@@ -22,7 +24,7 @@ export const DashboardPage = () => {
         <div>
             <h2>Welcome {session.user.email}</h2>
 
-            <p>You have linked {linkedInstitutions.length} banks.</p>
+            <p>You have linked {isSuccess ? linkedInstitutions.length : 0} banks.</p>
             <h4>Total spending this month: </h4>
             <h2>$1403</h2>
 
