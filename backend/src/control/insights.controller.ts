@@ -8,6 +8,7 @@
 import { InsightInterval, InsightResponse } from "@shared/types/insights.types";
 import { NextFunction, Request, Response } from "express";
 import { getUserInsights } from "../services/insights.service";
+import { AuthenticatedRequest } from "../types/auth";
 
 /**
  * Express route handler that retrieves user insights over a specified date interval.
@@ -26,16 +27,18 @@ import { getUserInsights } from "../services/insights.service";
  * - `from`: Start date.
  * - `to`: End date.
  * - `groups`: Computed insight groups from the database/service layer.
- * 
+ *
  * Errors:
  * - 400 if `from` or `to` is missing.
  * - 400 if `from` is later than `to`.
  * - Passes any internal error to Express' `next()` error handler.
- * 
+ *
  * @returns Sends a JSON `InsightResponse` on success.
  */
 export const handleGetInsights = async (req: Request, res: Response, next: NextFunction) => {
     try {
+        const userId = (req as AuthenticatedRequest).user.id;
+
         const {
             interval = "weekly",
             from,
@@ -53,7 +56,7 @@ export const handleGetInsights = async (req: Request, res: Response, next: NextF
         if (!from || !to) return res.status(400).json({ error: "`from` and `to` are required" });
         if (from > to) return res.status(400).json({ error: "`from` date must be earlier than `to` date" });
 
-        const data = await getUserInsights({ interval, from, to });
+        const data = await getUserInsights({ interval, from, to, userId });
 
         const response: InsightResponse = {
             interval,

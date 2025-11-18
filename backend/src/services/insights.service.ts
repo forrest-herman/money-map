@@ -35,6 +35,7 @@ const intervalMap: Record<InsightInterval, RpcInterval> = {
  *   interval: "weekly",
  *   from: "2025-01-01",
  *   to: "2025-01-31",
+ *   input_user_id: "aetewtoiskdgg3ijdsogi"
  * });
  */
 export const getUserInsights = async (params: GetInsightsArgs) => {
@@ -44,6 +45,7 @@ export const getUserInsights = async (params: GetInsightsArgs) => {
         from_date: params.from,
         to_date: params.to,
         interval_unit: interval,
+        input_user_id: params.userId,
     });
     if (error) throw new AppError("Failed to get user insights", 500, error);
 
