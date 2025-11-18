@@ -16,7 +16,7 @@ const API_BASE_URL = process.env.RENDER_EXTERNAL_URL || process.env.API_BASE_URL
  * Express handler for Plaid webhooks.
  *
  * Processes incoming webhook events from Plaid, logging the webhook type and code,
- * and handling transaction-related updates by calling `handleSaveItemTransactionHistory`.
+ * and handling transaction-related updates by calling `saveItemTransactionHistory`.
  * Unhandled webhook types or codes are logged for debugging.
  *
  * Plaid requires a `200 OK` response regardless of processing outcome.
@@ -42,7 +42,7 @@ export const handleWebhook = async (req: Request, res: Response) => {
                     case "INITIAL_UPDATE":
                     case "HISTORICAL_UPDATE":
                         // TODO: this could possibly take too long, might need to consider adding a batch action
-                        await handleSaveItemTransactionHistory(item_id);
+                        await _saveItemTransactionHistory({itemId: item_id});
                         break;
 
                     default:
@@ -146,7 +146,6 @@ export const connectPlaid = async (req: Request, res: Response, next: NextFuncti
  * Returns a summary of results per item.
  */
 export const syncTransactions = async (req: Request, res: Response, next: NextFunction) => {
-    // TODO: need a version that doesn't require authentication so I can run it daily as a job
     try {
         const userId = (req as AuthenticatedRequest).user.id;
 
@@ -286,19 +285,87 @@ const syncItem = async (item: Partial<Institution> & Pick<Institution, "access_t
     };
 };
 
+
+type SaveItemTransactionHistoryArgs = {
+  /** Plaid item (institution) ID. */
+  itemId: string
+} | {
+  item: Institution;
+  userId: string
+}
+
 /**
- * Performs the initial full import of transactions for a newly-linked Plaid item.
- * Fetches the complete transaction history and upserts them into the database.
+ * Performs the initial full import of transactions for a Plaid item.
+ *
+ * This function accepts either:
+ * - an `itemId`, in which case the corresponding Institution is fetched from the database, or
+ * - an `item` + `userId` pair, which skips the lookup.
+ *
+ * It retrieves the full transaction history from Plaid, transforms the data into your
+ * internal transaction format, and upserts all transactions into the database.
+ *
+ * @returns {Promise<{ itemId: string; added: number }>} The Plaid item ID and the number of transactions imported.
  */
-const handleSaveItemTransactionHistory = async (
-    /** Plaid item (institution) ID. */
-    itemId: string
-) => {
-    const item = await getInstitutionByItemId(itemId);
+const _saveItemTransactionHistory = async (args: SaveItemTransactionHistoryArgs) => {
+    let item: Institution;
+    let userId: string;
 
-    const { access_token: accessToken, user_id: userId } = item;
+    if ("itemId" in args) {
+      item = await getInstitutionByItemId(args.itemId);
+      userId = item.user_id;
+    } else {
+      item = args.item
+      userId = args.userId
+    }
 
-    const transactions = await getTransactions(accessToken);
-    const formattedTx = transactions.map((t) => mapPlaidTransaction(t, userId, itemId));
+    const transactions = await getTransactions(item.access_token);
+    const formattedTx = transactions.map((t) => mapPlaidTransaction(t, userId, item.item_id));
     await upsertTransactions(formattedTx);
+
+    return {
+        itemId: item.item_id,
+        added: formattedTx.length,
+    };
+};
+
+
+/**
+ * Syncs a user's full historical transactions from all linked Plaid items.
+ *
+ * This endpoint:
+ * - Retrieves all Plaid institutions linked to the authenticated user.
+ * - Runs a full transaction history import for each item in parallel.
+ * - Aggregates results (success & failure) and returns a summary.
+ *
+ * @returns JSON response containing:
+ *   - `succeeded` {number} Count of successful imports.
+ *   - `failed` {number} Count of failed imports.
+ *   - `items` {Array} Per-item import details (success state, itemId, added count, or error info).
+ */
+export const handleGetUserTransactionsHistory = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const userId = (req as AuthenticatedRequest).user.id;
+
+        // Retrieve banks' access tokens
+        const items = await getInstitutionsByUser(userId);
+
+        if (!items || items.length === 0) return res.json({ message: `No items found under userId: ${userId}` });
+
+        // Iterate through items in parallel
+        const results = await Promise.allSettled(items.map((item) => _saveItemTransactionHistory({item, userId})));
+
+        const summary = results.map((r) => {
+            if (r.status === "fulfilled") {
+                return { success: true, ...r.value };
+            } else {
+                return { success: false, reason: r.reason?.message || "Unknown error", context: r.reason?.context };
+            }
+        });
+        const succeeded = summary.filter((r) => r.success).length;
+        const failed = summary.filter((r) => !r.success).length;
+
+        res.json({ succeeded, failed, items: summary });
+    } catch (err) {
+        next(err);
+    }
 };
