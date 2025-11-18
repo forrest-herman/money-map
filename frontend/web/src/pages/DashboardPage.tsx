@@ -5,8 +5,6 @@ import { useGetSessionQuery } from "../utils/supabaseApi";
 export const DashboardPage = () => {
     const { data: session } = useGetSessionQuery();
 
-    console.log("session token", session?.access_token); // TODO: remove
-
     if (!session) return <Login />;
 
     const linkedInstitutions = [];
