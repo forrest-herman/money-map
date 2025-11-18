@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { getInstitutionsByUser, saveInstitutionItemToDB } from "../services/institution.service";
 import { AuthenticatedRequest } from "../types/auth";
+import { getAccountsByUser } from "../services/account.service";
 
 /**
  * Get all linked institutions for the authenticated user.
@@ -30,6 +31,16 @@ export const upsertInstitution = async (req: Request, res: Response, next: NextF
         const { item_id, access_token } = req.body;
 
         // await saveInstitutionItemToDB(userId, accessToken, item);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const handleGetAccounts = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const userId = (req as AuthenticatedRequest).user.id;
+        const accounts = await getAccountsByUser(userId);
+        res.json(accounts);
     } catch (error) {
         next(error);
     }

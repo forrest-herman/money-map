@@ -16,4 +16,12 @@ export const upsertAccountsToDB = async (accounts: any[]) => {
     if (error) throw new AppError("Failed to save accounts", 500, error);
 };
 
-// TODO: updateAccountBalances?
+export const getAccountsByUser = async (userId: string) => {
+    const { data, error } = await supabase
+        .from("accounts")
+        .select("*") // select all columns
+        .eq("user_id", userId); // filter by userId
+
+    if (error) throw new AppError(`Failed to fetch accounts for user ${userId}`, 500, error);
+    else return data;
+};
