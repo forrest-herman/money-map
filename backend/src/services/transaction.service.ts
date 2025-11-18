@@ -27,7 +27,7 @@ export const getTransactions = async (
     pagination: PaginationParams = {}
 ): Promise<PaginatedTransactionsResponse> => {
     const page = pagination.page ?? 1;
-    const pageSize = pagination.pageSize ?? 50;
+    const pageSize = pagination.pageSize ?? 100;
 
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
@@ -41,6 +41,7 @@ export const getTransactions = async (
     if (filters.endDate) query = query.lte("date", filters.endDate);
     if (filters.minAmount !== undefined) query = query.gte("amount", filters.minAmount);
     if (filters.maxAmount !== undefined) query = query.lte("amount", filters.maxAmount);
+    if (filters.category) query = query.eq("category", filters.category);
 
     if (filters.search) {
         // Case-insensitive search against name, merchant, or notes columns
@@ -81,6 +82,7 @@ export const upsertTransactions = async (transactions: any[]) => {
         onConflict: "transaction_id",
     });
     if (error) throw new AppError("Failed to save transactions", 500, error);
+    console.info(`Successfully upserted ${transactions.length} transactions`);
 };
 
 /**
