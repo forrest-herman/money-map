@@ -1,11 +1,63 @@
 import { Request, Response, NextFunction } from "express";
 import { exchangePublicToken, fetchItemAccountsData, fetchTransactionSync, linkTokenCreate, getTransactions } from "../services/plaid.service";
 import { ItemAlreadyExistsError } from "../utils/errors";
-import { AccountBase, CountryCode, Products, Transaction } from "plaid";
-import { getInstitutionsByUser, saveInstitutionItemToDB, updateInstitutionItemCursor } from "../services/institution.service";
+import { CountryCode, Products } from "plaid";
+import { getInstitutionByItemId, getInstitutionsByUser, saveInstitutionItemToDB, updateInstitutionItemCursor } from "../services/institution.service";
 import { upsertTransactions } from "../services/transaction.service";
 import { upsertAccountsToDB } from "../services/account.service";
 import { AuthenticatedRequest } from "../types/auth";
+import { PlaidWebhook } from "../types/plaidWebhooks";
+import { mapPlaidAccount, mapPlaidTransaction } from "../utils/plaidMappingHelpers";
+
+/**
+ * Express handler for Plaid webhooks.
+ *
+ * Processes incoming webhook events from Plaid, logging the webhook type and code,
+ * and handling transaction-related updates by calling `handleSaveItemTransactionHistory`.
+ * Unhandled webhook types or codes are logged for debugging.
+ *
+ * Plaid requires a `200 OK` response regardless of processing outcome.
+ *
+ * @param {Request} req - The Express request object containing the webhook payload in `req.body`.
+ * @param {Response} res - The Express response object used to send the acknowledgement.
+ *
+ * @returns {Promise<void>} Sends a JSON response `{ received: true }` on success or a `200` status on error.
+ *
+ * @example
+ * app.post('/webhook', handleWebhook);
+ */
+export const handleWebhook = async (req: Request, res: Response) => {
+    try {
+        const body = req.body as PlaidWebhook;
+        const { webhook_type, webhook_code, item_id } = body;
+
+        console.log("Plaid webhook:", webhook_type, webhook_code, item_id);
+
+        switch (webhook_type) {
+            case "TRANSACTIONS":
+                switch (webhook_code) {
+                    case "INITIAL_UPDATE":
+                    case "HISTORICAL_UPDATE":
+                        // TODO: this could possibly take too long, might need to consider adding a batch action
+                        await handleSaveItemTransactionHistory(item_id);
+                        break;
+
+                    default:
+                        console.log("Unhandled webhook code:", webhook_code);
+                        break;
+                }
+                break;
+            default:
+                console.log("Unhandled webhook type:", webhook_type);
+                break;
+        }
+
+        res.json({ received: true });
+    } catch (err) {
+        console.error("Webhook error:", err);
+        res.status(200).send(); // Plaid requires 200 no matter what
+    }
+};
 
 /**
  * Creates a Plaid Link Token for the authenticated user.
@@ -29,6 +81,7 @@ export const createLinkToken = async (req: Request, res: Response, next: NextFun
             client_name: APP_NAME,
             country_codes: [CountryCode.Ca, CountryCode.Us],
             language: "en",
+            webhook: `${process.env.API_URL}/plaid/webhook`,
         };
 
         let payload;
@@ -46,11 +99,11 @@ export const createLinkToken = async (req: Request, res: Response, next: NextFun
 
 /**
  * Exchanges a public_token for an access_token, fetches the Plaid item + accounts,
- * stores the item (if new), upserts accounts, and imports full transaction history.
- * 
- * NOTE: You must use Plaid's front end login service to generate the necessary public_token.
+ * stores the item (if new), and upserts accounts.
  *
- * If the item already exists, the request continues without failing.
+ * Transaction data is not immediately available. Plaid will respond with a webhook later.
+ *
+ * NOTE: You must use Plaid's front end login service to generate the necessary public_token.
  *
  * @route POST /plaid/connect
  * @returns {void} Returns `{ success: true }` when the item is linked successfully.
@@ -64,17 +117,12 @@ export const connectPlaid = async (req: Request, res: Response, next: NextFuncti
 
         const { item, accounts } = await fetchItemAccountsData(accessToken);
 
+        // TODO build the Institution item here, and pass that to next function
         // TODO: handle item already exists, but account is new! Don't resave item
         // Old access token will be good even for the new accounts
-        try {
-            await saveInstitutionItemToDB(userId, accessToken, item);
-        } catch (err) {
-            if (err instanceof ItemAlreadyExistsError) console.log("Item already exists → continuing");
-        }
+        await saveInstitutionItemToDB(userId, accessToken, item);
 
         await upsertAccountsToDB(accounts.map((a) => mapPlaidAccount(a, userId, itemId)));
-
-        await saveTransactionHistory(accessToken, userId, itemId);
 
         res.json({ success: true });
     } catch (err) {
@@ -95,6 +143,7 @@ export const connectPlaid = async (req: Request, res: Response, next: NextFuncti
  * Returns a summary of results per item.
  */
 export const syncTransactions = async (req: Request, res: Response, next: NextFunction) => {
+    // TODO: need a version that doesn't require authentication so I can run it daily as a job
     try {
         const userId = (req as AuthenticatedRequest).user.id;
 
@@ -167,77 +216,16 @@ const syncItem = async (item: { access_token: string; item_id: string; cursor?: 
  * Performs the initial full import of transactions for a newly-linked Plaid item.
  * Fetches the complete transaction history and upserts them into the database.
  */
-const saveTransactionHistory = async (
-    /** Plaid access token for the item. */
-    accessToken: string,
-    /** ID of the authenticated user. */
-    userId: string,
+const handleSaveItemTransactionHistory = async (
     /** Plaid item (institution) ID. */
     itemId: string
 ) => {
+    const item = await getInstitutionByItemId(itemId);
+
+    const { access_token: accessToken, user_id: userId } = item;
+
     const transactions = await getTransactions(accessToken);
     const formattedTx = transactions.map((t) => mapPlaidTransaction(t, userId, itemId));
     await upsertTransactions(formattedTx);
 };
 
-/**
- * Maps a Plaid Transaction object into the internal transaction schema
- * used in the database.
- *
- * @returns Mapped transaction ready for database upsert.
- * // TODO: make response the CustomTransaction type
- */
-function mapPlaidTransaction(
-    /** Plaid transaction object. */
-    t: Transaction,
-    /** User ID. */
-    userId: string,
-    /** Plaid item ID the transaction belongs to. */
-    itemId: string
-): any {
-    return {
-        transaction_id: t.transaction_id,
-        user_id: userId,
-        item_id: itemId,
-        account_id: t.account_id,
-        merchant_name: t.merchant_name,
-        name: t.name,
-        amount: t.amount,
-        date: t.date,
-        iso_currency_code: t.iso_currency_code,
-        location: t.location.city ? `${t.location.city}, ${t.location.region}` : null,
-        payment_channel: t.payment_channel,
-        pending: t.pending,
-        category: t.personal_finance_category?.primary,
-        subcategory: t.personal_finance_category?.detailed,
-        plaid_metadata: t,
-    };
-}
-
-/**
- * Maps a Plaid AccountBase object into the internal account schema
- * used in the database.
-
-* @returns Mapped account object ready for database upsert.
- */
-const mapPlaidAccount = (
-    /** Plaid account object. */
-    a: AccountBase,
-    /** User ID. */
-    userId: string,
-    /** Plaid item ID the account belongs to. */
-    itemId: string
-) => {
-    return {
-        user_id: userId,
-        item_id: itemId,
-        account_id: a.account_id,
-        name: a.name,
-        official_name: a.official_name,
-        mask: a.mask,
-        type: a.type,
-        subtype: a.subtype,
-        balances: a.balances,
-        updated_at: new Date().toISOString(),
-    };
-};
