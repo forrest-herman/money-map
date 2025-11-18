@@ -8,12 +8,13 @@ import transactionRoutes from "./routes/transaction.routes";
 import insightsRoutes from "./routes/insights.routes";
 
 const app = express();
-const port = process.env.PORT || 4000;
+const port = process.env.PORT;
 
 app.use(cors());
 app.use(express.json());
 
 // Mount routes
+app.use('/status', (_req, res)=>res.status(200).send("Ok")) // check status of backend and keep alive
 app.use("/plaid", plaidRoutes);
 app.use("/user", userRoutes);
 app.use("/transactions", transactionRoutes);
