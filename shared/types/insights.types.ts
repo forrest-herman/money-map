@@ -4,6 +4,7 @@ export type GetInsightsArgs = {
     /** Format YYYY-MM-DD */
     to: string;
     interval: InsightInterval;
+    userId: string;
 };
 
 /**
