@@ -38,12 +38,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({ filters, pageS
     const getAccountNameByid = (accountId: string) => {
         if (!accounts) return accountId;
         const account = accounts.find((a) => a.account_id === accountId);
-        return account.official_name;
+        return account?.official_name ?? account?.name;
     };
 
     const getBankNameByItemId = (itemId: string) => {
         const bank = institutions?.find((institution) => institution.item_id === itemId);
-        return bank.institution_name;
+        return bank?.institution_name ?? bank?.item_id;
     };
 
     return (
