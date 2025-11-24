@@ -1,4 +1,5 @@
 import { useGetAccountsQuery, useGetInstitutionsQuery } from "../utils/userApi";
+import { LinkBankButton } from "./LinkBankButton";
 
 export const AccountList = () => {
     const { data: accounts, isLoading: isAccountsLoading } = useGetAccountsQuery();
@@ -12,12 +13,19 @@ export const AccountList = () => {
         return bank?.institution_name;
     };
 
+    const getInstitutionByItemId = (itemId: string) => {
+        return institutions?.find((institution) => institution.item_id === itemId);
+    };
+
     if (!accounts || accounts?.length === 0) return <div>No accounts found</div>;
 
     return accounts?.map((account) => {
+        const { plaid_status: linkStatus, access_token: accessToken } = getInstitutionByItemId(account.item_id) ?? {};
+
         return (
             <div key={account.id}>
                 <h3>{getBankNameByItemId(account.item_id) + " " + account.official_name}</h3>
+                {linkStatus && <LinkBankButton accessToken={accessToken} />}
                 <div key={account.id} style={{ display: "flex", flex: 1, flexDirection: "row", gap: 100 }}>
                     <div>
                         <h5>{account.name}</h5>
