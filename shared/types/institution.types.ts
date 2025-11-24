@@ -19,4 +19,6 @@ export interface Institution {
     institution_id: string | null;
     /** Plaid sync cursor for incremental transaction sync */
     cursor?: string | null;
+    /** Plaid error or message if last sync failed */
+    plaid_status?: string | null;
 }
