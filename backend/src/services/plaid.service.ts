@@ -1,5 +1,6 @@
-import { AccountBase, CountryCode, Products, RemovedTransaction, Transaction } from "plaid";
-import { AppError } from "../utils/errors";
+import type { AxiosError } from "axios";
+import { AccountBase, CountryCode, PlaidError, Products, RemovedTransaction, Transaction } from "plaid";
+import { AppError, PlaidItemLoginRequiredError } from "../utils/errors";
 import { plaidClient } from "./config/plaidClient";
 
 /**
@@ -139,7 +140,11 @@ export const fetchTransactionSync = async (accessToken: string, initialCursor?: 
             cursor = data.next_cursor;
         }
     } catch (error) {
-        cursor = initialCursor;
+        cursor = initialCursor; // reset cursor
+        const plaidError = (error as AxiosError<any>).response?.data as PlaidError;
+
+        if (plaidError?.error_code === "ITEM_LOGIN_REQUIRED") throw new PlaidItemLoginRequiredError();
+
         throw new AppError("Failed to fetch transactions via sync", 500, error);
     }
 
