@@ -81,8 +81,27 @@ export const updateInstitutionItemCursor = async (userId: string, itemId: string
         .from("linked_institutions")
         .update({
             cursor: cursor ?? null,
+            plaid_status: null, // Update worked, clear any error statuses
         })
         .eq("user_id", userId)
         .eq("item_id", itemId);
     if (error) throw new AppError("Failed to save Plaid item cursor update", 500, error);
+};
+
+/**
+ * Updates the Plaid item error state for a given user and item.
+ *
+ * @param userId - ID of the user.
+ * @param itemId - Plaid item ID.
+ * @throws AppError if the database update fails.
+ */
+export const updateInstitutionItemError = async (userId: string, itemId: string, status: string | null = null) => {
+    const response = await supabase
+        .from("linked_institutions")
+        .update({
+            plaid_status: status,
+        })
+        .eq("user_id", userId)
+        .eq("item_id", itemId);
+    if (response.error) throw new AppError("Failed to save Plaid item status", 500, response.error);
 };
