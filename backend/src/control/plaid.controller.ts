@@ -1,8 +1,15 @@
 import { Request, Response, NextFunction } from "express";
 import { exchangePublicToken, fetchItemAccountsData, fetchTransactionSync, linkTokenCreate, getTransactions } from "../services/plaid.service";
-import { ItemAlreadyExistsError } from "../utils/errors";
+import { ItemAlreadyExistsError, PlaidItemLoginRequiredError } from "../utils/errors";
 import { CountryCode, Products } from "plaid";
-import { getAllLinkedInstitutions, getInstitutionByItemId, getInstitutionsByUser, saveInstitutionItemToDB, updateInstitutionItemCursor } from "../services/institution.service";
+import {
+    getAllLinkedInstitutions,
+    getInstitutionByItemId,
+    getInstitutionsByUser,
+    saveInstitutionItemToDB,
+    updateInstitutionItemCursor,
+    updateInstitutionItemError,
+} from "../services/institution.service";
 import { upsertTransactions } from "../services/transaction.service";
 import { upsertAccountsToDB } from "../services/account.service";
 import { AuthenticatedRequest } from "../types/auth";
@@ -34,7 +41,7 @@ export const handleWebhook = async (req: Request, res: Response) => {
         const body = req.body as PlaidWebhook;
         const { webhook_type, webhook_code, item_id } = body;
 
-        console.log("Plaid webhook:", webhook_type, webhook_code, item_id);
+        console.log("Plaid webhook:", webhook_type, webhook_code, item_id, "body:", body);
 
         switch (webhook_type) {
             case "TRANSACTIONS":
@@ -42,7 +49,38 @@ export const handleWebhook = async (req: Request, res: Response) => {
                     case "INITIAL_UPDATE":
                     case "HISTORICAL_UPDATE":
                         // TODO: this could possibly take too long, might need to consider adding a batch action
-                        await _saveItemTransactionHistory({itemId: item_id});
+                        await _saveItemTransactionHistory({ itemId: item_id });
+                        break;
+
+                    // case "DEFAULT_UPDATE":
+                    //     // TODO: start a sync for that item_id
+                    //     break;
+
+                    default:
+                        console.log("Unhandled webhook code:", webhook_code);
+                        break;
+                }
+                break;
+
+            case "ITEM":
+                switch (webhook_code) {
+                    case "LOGIN_REPAIRED":
+                        console.log("LOGIN_REPAIRED body", body);
+                        // await updateInstitutionItemError()
+                        // sync again
+                        break;
+
+                    case "PENDING_EXPIRATION":
+                    case "PENDING_DISCONNECT":
+                        // TODO: handle PENDING_DISCONNECT
+                        console.log("item in bad state, need to mark as relink required");
+                        // const { id: itemId } = await retrieveItemByPlaidItemId(plaidItemId);
+                        // await updateItemStatus(itemId, 'bad');
+                        // serverLogAndEmitSocket(
+                        //   `user needs to re-enter login credentials`,
+                        //   itemId,
+                        //   error
+                        // );
                         break;
 
                     default:
@@ -50,9 +88,12 @@ export const handleWebhook = async (req: Request, res: Response) => {
                         break;
                 }
                 break;
+
             default:
                 console.log("Unhandled webhook type:", webhook_type);
                 break;
+
+            // https://plaid.com/docs/link/update-mode/?_gl=1*1gqzvo*_gcl_au*NTE5MTY3OTUxLjE3NTY5MTE2MDM.*_ga*NzIxMTA2MjQ5LjE3NTY5MTE2MDI.*_ga_3V9NV2HMZW*czE3NjM3NDE0NTkkbzEyJGcxJHQxNzYzNzQxNzIzJGo2MCRsMCRoMjI3Njg3MTk2#refreshing-item-expiration-dates
         }
 
         res.json({ received: true });
@@ -256,43 +297,49 @@ const syncItem = async (item: Partial<Institution> & Pick<Institution, "access_t
     const { access_token: accessToken, item_id: itemId, cursor } = item;
 
     // TODO: allow cursor = null for full re-sync
-    const data = await fetchTransactionSync(accessToken, cursor ?? undefined);
-    const { accounts, added, modified, removed, next_cursor } = data;
+    try {
+        const data = await fetchTransactionSync(accessToken, cursor ?? undefined);
+        const { accounts, added, modified, removed, next_cursor } = data;
 
-    await upsertAccountsToDB(accounts.map((a) => mapPlaidAccount(a, userId, itemId)));
+        await upsertAccountsToDB(accounts.map((a) => mapPlaidAccount(a, userId, itemId)));
 
-    // Upsert transactions (added + modified)
-    const txToUpsert = [...added.map((t) => mapPlaidTransaction(t, userId, itemId)), ...modified.map((t) => mapPlaidTransaction(t, userId, itemId))];
-    await upsertTransactions(txToUpsert);
+        // Upsert transactions (added + modified)
+        const txToUpsert = [...added.map((t) => mapPlaidTransaction(t, userId, itemId)), ...modified.map((t) => mapPlaidTransaction(t, userId, itemId))];
+        await upsertTransactions(txToUpsert);
 
-    /**
-     * // TODO: removed transactions
-     * Most apps do one of the following:
-     * Soft delete
-     * is_deleted = true
-     * Mark as reversed
-     * Hide them from UI
-     */
+        /**
+         * // TODO: removed transactions
+         * Most apps do one of the following:
+         * Soft delete
+         * is_deleted = true
+         * Mark as reversed
+         * Hide them from UI
+         */
 
-    // Once successful, update cursor
-    await updateInstitutionItemCursor(userId, itemId, next_cursor);
+        // Once successful, update cursor and clear item status (if applicable)
+        await updateInstitutionItemCursor(userId, itemId, next_cursor);
 
-    return {
-        itemId,
-        added: added.length,
-        modified: modified.length,
-        removed: removed.length,
-    };
+        return {
+            itemId,
+            added: added.length,
+            modified: modified.length,
+            removed: removed.length,
+        };
+    } catch (error) {
+        if (error instanceof PlaidItemLoginRequiredError) await updateInstitutionItemError(userId, itemId, "ITEM_LOGIN_REQUIRED"); // TODO: make error an enum
+        throw error;
+    }
 };
 
-
-type SaveItemTransactionHistoryArgs = {
-  /** Plaid item (institution) ID. */
-  itemId: string
-} | {
-  item: Institution;
-  userId: string
-}
+type SaveItemTransactionHistoryArgs =
+    | {
+          /** Plaid item (institution) ID. */
+          itemId: string;
+      }
+    | {
+          item: Institution;
+          userId: string;
+      };
 
 /**
  * Performs the initial full import of transactions for a Plaid item.
@@ -311,11 +358,11 @@ const _saveItemTransactionHistory = async (args: SaveItemTransactionHistoryArgs)
     let userId: string;
 
     if ("itemId" in args) {
-      item = await getInstitutionByItemId(args.itemId);
-      userId = item.user_id;
+        item = await getInstitutionByItemId(args.itemId);
+        userId = item.user_id;
     } else {
-      item = args.item
-      userId = args.userId
+        item = args.item;
+        userId = args.userId;
     }
 
     const transactions = await getTransactions(item.access_token);
@@ -327,7 +374,6 @@ const _saveItemTransactionHistory = async (args: SaveItemTransactionHistoryArgs)
         added: formattedTx.length,
     };
 };
-
 
 /**
  * Syncs a user's full historical transactions from all linked Plaid items.
@@ -352,7 +398,7 @@ export const handleGetUserTransactionsHistory = async (req: Request, res: Respon
         if (!items || items.length === 0) return res.json({ message: `No items found under userId: ${userId}` });
 
         // Iterate through items in parallel
-        const results = await Promise.allSettled(items.map((item) => _saveItemTransactionHistory({item, userId})));
+        const results = await Promise.allSettled(items.map((item) => _saveItemTransactionHistory({ item, userId })));
 
         const summary = results.map((r) => {
             if (r.status === "fulfilled") {

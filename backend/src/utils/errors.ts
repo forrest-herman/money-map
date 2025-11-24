@@ -19,6 +19,15 @@ export class AppError extends Error {
     }
 }
 
+export class PlaidItemLoginRequiredError extends AppError {
+    constructor(message = "Item login required", statusCode = 409) {
+        super(message);
+        this.name = "PlaidItemLoginRequiredError";
+        this.statusCode = statusCode;
+        Object.setPrototypeOf(this, PlaidItemLoginRequiredError.prototype);
+    }
+}
+
 export class ItemAlreadyExistsError extends Error {
     constructor(message = "Item already exists") {
         super(message);
