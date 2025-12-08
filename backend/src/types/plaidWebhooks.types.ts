@@ -34,12 +34,19 @@ interface TransactionsHistoricalUpdateWebhook extends PlaidWebhookBase {
     new_transactions: number;
 }
 
+interface TransactionsDefaultUpdateWebhook extends PlaidWebhookBase {
+    webhook_type: "TRANSACTIONS";
+    webhook_code: "DEFAULT_UPDATE";
+    item_id: string;
+    new_transactions: number;
+}
+
 interface ItemWebhook extends PlaidWebhookBase {
     webhook_type: "ITEM";
-    webhook_code: "PENDING_DISCONNECT" | "PENDING_EXPIRATION" | "LOGIN_REPAIRED";
+    webhook_code: "PENDING_DISCONNECT" | "PENDING_EXPIRATION" | "LOGIN_REPAIRED" | "ITEM_LOGIN_REQUIRED";
     // TODO: finish possible values (needs testing)
 }
 
-type PlaidTransactionsWebhook = TransactionsInitialUpdateWebhook | TransactionsHistoricalUpdateWebhook;
+type PlaidTransactionsWebhook = TransactionsInitialUpdateWebhook | TransactionsHistoricalUpdateWebhook | TransactionsDefaultUpdateWebhook;
 
 export type PlaidWebhook = PlaidTransactionsWebhook | ItemWebhook;

@@ -52,9 +52,9 @@ export const handleWebhook = async (req: Request, res: Response) => {
                         await _saveItemTransactionHistory({ itemId: item_id });
                         break;
 
-                    // case "DEFAULT_UPDATE":
-                    //     // TODO: start a sync for that item_id
-                    //     break;
+                    case "DEFAULT_UPDATE":
+                        await _syncItemTransactions({ itemId: item_id });
+                        break;
 
                     default:
                         console.log("Unhandled webhook code:", webhook_code);
@@ -64,6 +64,10 @@ export const handleWebhook = async (req: Request, res: Response) => {
 
             case "ITEM":
                 switch (webhook_code) {
+                    case "ITEM_LOGIN_REQUIRED":
+                        // TODO: handle this case
+                        // await updateInstitutionItemError(userId, body.itemId, "ITEM_LOGIN_REQUIRED")
+                        break;
                     case "LOGIN_REPAIRED":
                         console.log("LOGIN_REPAIRED body", body);
                         // await updateInstitutionItemError()
@@ -373,6 +377,33 @@ const _saveItemTransactionHistory = async (args: SaveItemTransactionHistoryArgs)
         itemId: item.item_id,
         added: formattedTx.length,
     };
+};
+
+/**
+ * Performs a sync update for a Plaid item.
+ *
+ * This function accepts either:
+ * - an `itemId`, in which case the corresponding Institution is fetched from the database, or
+ * - an `item` + `userId` pair, which skips the lookup.
+ *
+ * It retrieves the new transactions from Plaid, transforms the data into your
+ * internal transaction format, and upserts all transactions into the database.
+ *
+ * @returns Returns a summary for this item.
+ */
+const _syncItemTransactions = async (args: SaveItemTransactionHistoryArgs) => {
+    let item: Institution;
+    let userId: string;
+
+    if ("itemId" in args) {
+        item = await getInstitutionByItemId(args.itemId);
+        userId = item.user_id;
+    } else {
+        item = args.item;
+        userId = args.userId;
+    }
+
+    return await syncItem(item, userId);
 };
 
 /**
