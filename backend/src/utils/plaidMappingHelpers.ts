@@ -15,7 +15,7 @@ import type { AccountBase, Transaction as PlaidTransaction } from "plaid";
  *
  */
 export const classifyTransaction = (tx: any): TransactionType => {
-    const amt = tx.amount;
+    const amt = -1 * tx.amount; // Plaid is backwards
     const pfc = tx.personal_finance_category?.primary;
 
     const isTransferCategory = pfc === "TRANSFER_OUT" || pfc === "TRANSFER_IN" || pfc === "LOAN_PAYMENTS";
