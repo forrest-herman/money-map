@@ -44,6 +44,8 @@ export interface Transaction {
     item_id: string | null;
     /** Transaction type (Plaid-defined or user-defined) */
     type: TransactionType | null;
+    /** Identify if the transaction has been deleted. */
+    is_removed?: boolean | null;
 }
 
 export type TransactionFilters = {

@@ -14,7 +14,7 @@ import { upsertTransactions } from "../services/transaction.service";
 import { upsertAccountsToDB } from "../services/account.service";
 import { AuthenticatedRequest } from "../types/auth";
 import { PlaidWebhook } from "../types/plaidWebhooks.types";
-import { mapPlaidAccount, mapPlaidTransaction } from "../utils/plaidMappingHelpers";
+import { mapPlaidAccount, mapPlaidTransaction, mapRemovedPlaidTransaction } from "../utils/plaidMappingHelpers";
 import { Institution } from "@shared/types/institution.types";
 
 const API_BASE_URL = process.env.RENDER_EXTERNAL_URL || process.env.API_BASE_URL;
@@ -297,10 +297,10 @@ export const handleSyncAllTransactions = async (req: Request, res: Response, nex
  *
  * Returns a summary for this item.
  */
-const syncItem = async (item: Partial<Institution> & Pick<Institution, "access_token" | "item_id">, userId: string) => {
-    const { access_token: accessToken, item_id: itemId, cursor } = item;
+const syncItem = async (item: Partial<Institution> & Pick<Institution, "access_token" | "item_id">, userId: string, resync?: boolean) => {
+    const { access_token: accessToken, item_id: itemId } = item;
+    const cursor = resync ? null : item.cursor; // If resync is true, set cursor to null
 
-    // TODO: allow cursor = null for full re-sync
     try {
         const data = await fetchTransactionSync(accessToken, cursor ?? undefined);
         const { accounts, added, modified, removed, next_cursor } = data;
@@ -308,17 +308,12 @@ const syncItem = async (item: Partial<Institution> & Pick<Institution, "access_t
         await upsertAccountsToDB(accounts.map((a) => mapPlaidAccount(a, userId, itemId)));
 
         // Upsert transactions (added + modified)
-        const txToUpsert = [...added.map((t) => mapPlaidTransaction(t, userId, itemId)), ...modified.map((t) => mapPlaidTransaction(t, userId, itemId))];
+        const txToUpsert = [
+            ...added.map((t) => mapPlaidTransaction(t, userId, itemId)),
+            ...modified.map((t) => mapPlaidTransaction(t, userId, itemId)),
+            ...removed.map((t) => mapRemovedPlaidTransaction(t, userId, itemId)),
+        ];
         await upsertTransactions(txToUpsert);
-
-        /**
-         * // TODO: removed transactions
-         * Most apps do one of the following:
-         * Soft delete
-         * is_deleted = true
-         * Mark as reversed
-         * Hide them from UI
-         */
 
         // Once successful, update cursor and clear item status (if applicable)
         await updateInstitutionItemCursor(userId, itemId, next_cursor);

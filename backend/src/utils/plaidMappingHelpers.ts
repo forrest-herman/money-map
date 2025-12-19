@@ -1,6 +1,6 @@
 import { Account } from "@shared/types/account.types";
 import { Transaction, TransactionType } from "@shared/types/transaction.types";
-import type { AccountBase, Transaction as PlaidTransaction } from "plaid";
+import type { AccountBase, Transaction as PlaidTransaction, RemovedTransaction } from "plaid";
 
 /**
  * Classifies a Plaid transaction into a simplified transaction type.
@@ -90,5 +90,23 @@ export const mapPlaidTransaction = (
         plaid_metadata: t,
         type: classifyTransaction(t),
         updated_at: new Date().toISOString(),
+    };
+};
+
+export const mapRemovedPlaidTransaction = (
+    /** Plaid transaction object. */
+    t: RemovedTransaction,
+    /** User ID. */
+    userId: string,
+    /** Plaid item ID the transaction belongs to. */
+    itemId: string
+): Partial<Transaction> => {
+    return {
+        transaction_id: t.transaction_id,
+        user_id: userId,
+        item_id: itemId,
+        account_id: t.account_id,
+        updated_at: new Date().toISOString(),
+        is_removed: true,
     };
 };
