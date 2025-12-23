@@ -82,6 +82,7 @@ export const updateInstitutionItemCursor = async (userId: string, itemId: string
         .update({
             cursor: cursor ?? null,
             plaid_status: null, // Update worked, clear any error statuses
+            last_sync: new Date().toISOString(),
         })
         .eq("user_id", userId)
         .eq("item_id", itemId);
