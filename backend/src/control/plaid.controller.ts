@@ -309,9 +309,8 @@ const syncItem = async (item: Partial<Institution> & Pick<Institution, "access_t
 
         // Upsert transactions (added + modified)
         const txToUpsert = [
-            ...added.map((t) => mapPlaidTransaction(t, userId, itemId)),
+            ...added.map((t) => mapPlaidTransaction(t, userId, itemId)), // TODO: handle pending_transaction_id
             ...modified.map((t) => mapPlaidTransaction(t, userId, itemId)),
-            ...removed.map((t) => mapRemovedPlaidTransaction(t, userId, itemId)),
         ];
         await upsertTransactions(txToUpsert);
 
