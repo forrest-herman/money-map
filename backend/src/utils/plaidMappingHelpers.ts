@@ -90,5 +90,6 @@ export const mapPlaidTransaction = (
         plaid_metadata: t,
         type: classifyTransaction(t),
         updated_at: new Date().toISOString(),
+        pending_transaction_id: t.pending_transaction_id,
     };
 };

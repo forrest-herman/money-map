@@ -146,3 +146,28 @@ export const updateRemovedTransactions = async (
 export async function deleteTransactions(transactionIds: string[]) {
     return supabase.from("transactions").delete().in("transaction_id", transactionIds);
 }
+
+
+/**
+ * Merge data from pending transactions into their posted counterparts
+ * and mark the pending transactions as removed.
+ *
+ * Calls the Postgres function `merge_pending_transactions` via Supabase RPC.
+ *
+ * @param newPostedIds - Array of transaction IDs that were just upserted
+ *                       and may have associated pending transactions.
+ * @throws {AppError} If the RPC call to Supabase fails.
+ */
+export const mergePendingTransactions = async (newPostedIds: string[]) => {
+  const { error } = await supabase.rpc("merge_pending_transactions", {
+    new_posted_ids: newPostedIds,
+  });
+
+  if (error) {
+    throw new AppError(
+      "Failed to merge pending transactions with posted counterparts",
+      500,
+      error
+    );
+  }
+};
