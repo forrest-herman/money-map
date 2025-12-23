@@ -10,11 +10,11 @@ import {
     updateInstitutionItemCursor,
     updateInstitutionItemError,
 } from "../services/institution.service";
-import { upsertTransactions } from "../services/transaction.service";
+import { updateRemovedTransactions, upsertTransactions } from "../services/transaction.service";
 import { upsertAccountsToDB } from "../services/account.service";
 import { AuthenticatedRequest } from "../types/auth";
 import { PlaidWebhook } from "../types/plaidWebhooks.types";
-import { mapPlaidAccount, mapPlaidTransaction, mapRemovedPlaidTransaction } from "../utils/plaidMappingHelpers";
+import { mapPlaidAccount, mapPlaidTransaction } from "../utils/plaidMappingHelpers";
 import { Institution } from "@shared/types/institution.types";
 
 const API_BASE_URL = process.env.RENDER_EXTERNAL_URL || process.env.API_BASE_URL;
@@ -313,6 +313,9 @@ const syncItem = async (item: Partial<Institution> & Pick<Institution, "access_t
             ...modified.map((t) => mapPlaidTransaction(t, userId, itemId)),
         ];
         await upsertTransactions(txToUpsert);
+
+        // Handle removed transactions
+        updateRemovedTransactions(removed.map((t) => t.transaction_id));
 
         // Once successful, update cursor and clear item status (if applicable)
         await updateInstitutionItemCursor(userId, itemId, next_cursor);

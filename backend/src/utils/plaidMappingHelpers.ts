@@ -92,21 +92,3 @@ export const mapPlaidTransaction = (
         updated_at: new Date().toISOString(),
     };
 };
-
-export const mapRemovedPlaidTransaction = (
-    /** Plaid transaction object. */
-    t: RemovedTransaction,
-    /** User ID. */
-    userId: string,
-    /** Plaid item ID the transaction belongs to. */
-    itemId: string
-): Partial<Transaction> => {
-    return {
-        transaction_id: t.transaction_id,
-        user_id: userId,
-        item_id: itemId,
-        account_id: t.account_id,
-        updated_at: new Date().toISOString(),
-        is_removed: true,
-    };
-};

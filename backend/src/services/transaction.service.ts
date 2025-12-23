@@ -97,6 +97,46 @@ export async function upsertTransaction(tx: any) {
     return supabase.from("transactions").upsert(tx, { onConflict: "transaction_id" });
 }
 
+
+
+/**
+ * Marks existing transactions as removed.
+ *
+ * - UPDATE ONLY (no inserts)
+ * - Uses `transaction_id` as the lookup key
+ * - Updates `updated_at` for auditability
+ *
+ * @param transactionIds - Array of Plaid transaction_ids to mark as removed
+ * @throws AppError if the database operation fails
+ */
+export const updateRemovedTransactions = async (
+  transactionIds: string[],
+) => {
+  if (transactionIds.length === 0) return;
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({
+      is_removed: true,
+      updated_at: new Date().toISOString(),
+    })
+    .in("transaction_id", transactionIds);
+
+  if (error) {
+    throw new AppError(
+      "Failed to mark transactions as removed",
+      500,
+      error,
+    );
+  }
+
+  console.info(
+    `Marked ${transactionIds.length} transactions as removed`,
+  );
+};
+
+
+
 /**
  * Deletes transactions from the database by their IDs.
  *
