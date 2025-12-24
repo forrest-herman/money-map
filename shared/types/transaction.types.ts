@@ -46,6 +46,8 @@ export interface Transaction {
     type: TransactionType | null;
     /** Identify if the transaction has been deleted. */
     is_removed?: boolean | null;
+    /** Replaced transaction_id if this is a posted transaction. */
+    pending_transaction_id?: string | null;
 }
 
 export type TransactionFilters = {
